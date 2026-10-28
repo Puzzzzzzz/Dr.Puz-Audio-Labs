@@ -27,6 +27,13 @@ Instalator NSIS trafia do katalogu `release/`. Aplikacja zapisuje bibliotekę, k
 - Sześć scen Three.js reagujących na analizę audio.
 - Napisy z plików SRT/VTT dla filmu oraz odczyt CPU, RAM i GPU, jeśli system udostępnia dane.
 
+## Odtwarzanie jako set
+
+- Na karcie playlisty wybierz przycisk BPM, aby lokalnie oszacować tempo jej utworów. Wyniki są zapisywane przy plikach i widoczne na liście.
+- W Ustawieniach ustaw globalne tempo w zakresie 80–120%; aplikacja zachowuje wysokość dźwięku.
+- Włącz crossfade i ustaw przejście od 2 do 12 sekund. Miksowanie działa dla kolejnych utworów audio w kolejce; przy znanych BPM tempo następnego utworu jest dopasowywane do bieżącego.
+- Analiza BPM wymaga dekodowalnego pliku audio do 256 MB. Nieobsługiwany plik pozostaje bez wyniku BPM.
+
 ## Kodeki i formaty
 
 Lista w aplikacji określa typy plików rozpoznawane przez bibliotekę. Dekodowanie zależy od kodeka, wersji Chromium/Electron oraz samego pliku. Odtwarzacz pokazuje komunikat, gdy dany plik nie może zostać zdekodowany. Weryfikację konkretnych kodeków należy wykonywać na instalatorze zbudowanym dla wydania.

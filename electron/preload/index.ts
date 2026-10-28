@@ -2,9 +2,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { PersistedState, Track, SystemStats } from '../../shared/types'
 
 const mediaApp = {
-  version: () => '0.1.3',
+  version: () => '0.1.4',
   controlWindow: (action: 'minimize' | 'maximize' | 'close') => ipcRenderer.send('window:control', action),
   setAlwaysOnTop: (enabled: boolean) => ipcRenderer.send('window:always-on-top', enabled),
+  readAudioFile: (path: string): Promise<Uint8Array> => ipcRenderer.invoke('media:read-audio', path),
   openMedia: (): Promise<Track[]> => ipcRenderer.invoke('dialog:open-media'),
   chooseFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:choose-folder'),
   scanFolder: (folder: string): Promise<Track[]> => ipcRenderer.invoke('library:scan', folder),

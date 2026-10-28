@@ -11,6 +11,7 @@ export interface Track {
   duration?: number
   size: number
   addedAt: number
+  bpm?: number
 }
 
 export interface Playlist {
@@ -40,6 +41,9 @@ export interface PersistedState {
   shuffle: boolean
   repeat: 'off' | 'all' | 'one'
   alwaysOnTop: boolean
+  playbackTempo: number
+  crossfadeEnabled: boolean
+  crossfadeSeconds: number
 }
 
 export interface SystemStats {
@@ -56,6 +60,7 @@ export interface MediaAppApi {
   version: () => string
   controlWindow: (action: 'minimize' | 'maximize' | 'close') => void
   setAlwaysOnTop: (enabled: boolean) => void
+  readAudioFile: (path: string) => Promise<Uint8Array>
   openMedia: () => Promise<Track[]>
   chooseFolder: () => Promise<string | null>
   scanFolder: (folder: string) => Promise<Track[]>
@@ -92,5 +97,6 @@ export function makeTrack(path: string, size = 0, addedAt = Date.now()): Track {
 export const defaultState: PersistedState = {
   folders: [], tracks: [], playlists: [], favorites: [], queue: [], currentTrackId: null,
   currentTime: 0, volume: 0.78, eqValues: Array(10).fill(0), eqPreset: 'Płaski',
-  customPresets: [], shuffle: false, repeat: 'off', alwaysOnTop: false
+  customPresets: [], shuffle: false, repeat: 'off', alwaysOnTop: false,
+  playbackTempo: 1, crossfadeEnabled: false, crossfadeSeconds: 6
 }

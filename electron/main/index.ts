@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import { existsSync, promises as fs, watch, type FSWatcher } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import * as si from 'systeminformation'
-import { defaultState, MEDIA_EXTENSIONS, makeTrack, type PersistedState, type SystemStats } from '../../shared/types'
+import { AUDIO_EXTENSIONS, defaultState, MEDIA_EXTENSIONS, makeTrack, type PersistedState, type SystemStats } from '../../shared/types'
 
 let mainWindow: BrowserWindow | null = null
 let statePath = ''
@@ -73,6 +73,13 @@ function registerIpc() {
     return result.canceled ? null : result.filePaths[0]
   })
   ipcMain.handle('library:scan', async (_event, folder: string) => scanFolder(folder))
+  ipcMain.handle('media:read-audio', async (_event, candidate: unknown) => {
+    if (typeof candidate !== 'string' || !AUDIO_EXTENSIONS.includes(extname(candidate).slice(1).toLowerCase())) throw new Error('Nieprawidłowy plik audio.')
+    const info = await fs.stat(candidate)
+    if (!info.isFile() || info.size > 256 * 1024 * 1024) throw new Error('Plik audio jest nieprawidłowy lub przekracza limit 256 MB.')
+    const data = await fs.readFile(candidate)
+    return new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength))
+  })
   ipcMain.handle('library:watch', async (_event, folders: string[]) => { folders.forEach(watchFolder); return true })
   ipcMain.handle('state:load', () => readState())
   ipcMain.handle('state:save', (_event, state: PersistedState) => saveState(state))
