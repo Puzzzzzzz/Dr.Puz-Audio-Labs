@@ -4,7 +4,7 @@ import type { EqPreset, MediaKind, PersistedState, Playlist, SystemStats, Track 
 import { defaultState, makeTrack } from '../shared/types'
 import { formatTime, pathToFileUrl } from '../shared/format'
 import Equalizer from './Equalizer'
-import { estimateBpm } from './bpm'
+import { alignBeatStartTime, estimateBeatGrid } from './bpm'
 import { BUILTIN_PRESETS } from './presets'
 import Visualizer, { VISUALS, type VisualMode } from './Visualizer'
 
@@ -21,7 +21,7 @@ const NAV = [
 
 const EMPTY_STATS: SystemStats = { cpuSystem: null, memoryUsed: null, memoryTotal: null, appCpu: null, appMemory: null, gpu: null, gpuName: null }
 type AudioDeck = 0 | 1
-interface CrossfadeTransition { outgoing: HTMLAudioElement; incoming: HTMLAudioElement; nextTrack: Track; nextDeck: AudioDeck; startedAt: number; duration: number; frame: number | null; started: boolean }
+interface CrossfadeTransition { outgoing: HTMLAudioElement; incoming: HTMLAudioElement; currentTrack: Track; nextTrack: Track; nextDeck: AudioDeck; startedAt: number; duration: number; frame: number | null; started: boolean }
 
 function fromM3U(text: string, sourcePath: string): Track[] {
   const base = sourcePath.slice(0, Math.max(sourcePath.lastIndexOf('/'), sourcePath.lastIndexOf('\\')) + 1)
@@ -291,6 +291,17 @@ export default function App() {
   const startTransitionPlayback = useCallback(async (transition: CrossfadeTransition) => {
     if (transitionRef.current !== transition || transition.started || transition.incoming.readyState < 2) return
     transition.started = true
+    if (transition.currentTrack.bpm && transition.currentTrack.beatOffset !== undefined && transition.nextTrack.bpm && transition.nextTrack.beatOffset !== undefined) {
+      transition.incoming.currentTime = alignBeatStartTime(
+        transition.outgoing.currentTime,
+        transition.currentTrack.bpm,
+        transition.currentTrack.beatOffset,
+        transition.outgoing.playbackRate,
+        transition.nextTrack.bpm,
+        transition.nextTrack.beatOffset,
+        transition.incoming.playbackRate
+      )
+    }
     ensureAudioGraph(transition.incoming)
     try { await transition.incoming.play() }
     catch {
@@ -318,7 +329,7 @@ export default function App() {
   const beginCrossfade = useCallback((nextTrack: Track, duration: number) => {
     const outgoing = getActiveAudioElement()
     const incoming = getInactiveAudioElement()
-    if (!outgoing || !incoming || nextTrack.kind !== 'audio') return
+    if (!outgoing || !incoming || !current || nextTrack.kind !== 'audio') return
     cancelCrossfade()
     const currentBpm = current?.bpm
     const nextBpm = nextTrack.bpm
@@ -331,11 +342,11 @@ export default function App() {
     incoming.src = pathToFileUrl(nextTrack.path)
     incoming.load()
     const nextDeck: AudioDeck = activeAudioDeckRef.current === 0 ? 1 : 0
-    const transition: CrossfadeTransition = { outgoing, incoming, nextTrack, nextDeck, startedAt: 0, duration, frame: null, started: false }
+    const transition: CrossfadeTransition = { outgoing, incoming, currentTrack: current, nextTrack, nextDeck, startedAt: 0, duration, frame: null, started: false }
     transitionRef.current = transition
     ensureAudioGraph(incoming)
     if (incoming.readyState >= 2) void startTransitionPlayback(transition)
-  }, [cancelCrossfade, current?.bpm, ensureAudioGraph, getActiveAudioElement, getInactiveAudioElement, startTransitionPlayback, state.playbackTempo])
+  }, [cancelCrossfade, current, ensureAudioGraph, getActiveAudioElement, getInactiveAudioElement, startTransitionPlayback, state.playbackTempo])
 
   const selectTrack = useCallback((track: Track, autoplay = false) => {
     cancelCrossfade()
@@ -484,10 +495,10 @@ export default function App() {
           const context = new AudioContextClass()
           try {
             const audio = await context.decodeAudioData(bytes.slice().buffer)
-            const bpm = estimateBpm(audio)
-            if (bpm) {
+            const beatGrid = estimateBeatGrid(audio)
+            if (beatGrid) {
               detected++
-              update(currentState => ({ tracks: currentState.tracks.map(item => item.id === track.id ? { ...item, bpm } : item) }))
+              update(currentState => ({ tracks: currentState.tracks.map(item => item.id === track.id ? { ...item, bpm: beatGrid.bpm, beatOffset: beatGrid.beatOffset } : item) }))
             } else failed++
           } finally { await context.close() }
         } catch { failed++ }
@@ -630,14 +641,14 @@ export default function App() {
       </section>
     </main>
 
-    <aside className="queue-panel"><div className="queue-head"><div><span className="eyebrow">PLAYBACK</span><h2><span>NEON</span> QUEUE <small>{queueTracks.length}</small></h2></div><div className="queue-head-actions"><button title="Dodaj pliki" onClick={() => void window.mediaApp.openMedia().then(tracks => addTracks(tracks))}><Plus size={18}/></button><button title="Wyczyść kolejkę" onClick={() => update({ queue: [] })}><X size={17}/></button></div></div><div className="queue-subhead"><span>{state.crossfadeEnabled ? "SET · CROSSFADE " + state.crossfadeSeconds + "s" : "KOLEJKA ODTWARZANIA"}</span><button onClick={saveQueueAsPlaylist}>ZAPISZ JAKO PLAYLISTĘ</button></div><div className="queue-list">{queueTracks.map((track, index) => <div className={`queue-item ${track.id === current?.id ? 'playing' : ''}`} key={`${track.id}-${index}`} onDoubleClick={() => selectTrack(track, true)}><div className="queue-index">{track.id === current?.id ? <span className="playing-bars"><i/><i/><i/></span> : String(index + 1).padStart(2, '0')}</div><button className="queue-cover" onClick={() => selectTrack(track, true)}><span>{track.kind === 'video' ? <Video size={15}/> : track.title.slice(0, 1).toUpperCase()}</span></button><button className="queue-title" onClick={() => selectTrack(track, true)}><b>{track.title}</b><span>{track.artist}{track.bpm ? " · " + track.bpm + " BPM" : ""}</span></button><span className="queue-duration">{formatTime(track.duration ?? 0)}</span><button className="more-button" title="Usuń z kolejki" onClick={() => toggleQueue(track)}><MoreVertical size={16}/></button></div>)}{!queueTracks.length && <div className="queue-empty"><ListMusic size={25}/><b>Kolejka jest pusta</b><span>Dodaj pliki lub wybierz utwór z biblioteki.</span><button onClick={() => void window.mediaApp.openMedia().then(tracks => addTracks(tracks))}><Plus size={14}/> DODAJ PLIKI</button></div>}</div><div className="queue-footer"><span><b>{String(queueTracks.length).padStart(2, '0')}</b> UTWORÓW</span><span>{formatTime(queueTracks.reduce((sum, track) => sum + (track.duration ?? 0), 0))}</span></div><div className="queue-stats"><div><span>CPU APLIKACJI</span><b>{stats.appCpu === null ? '—' : `${stats.appCpu.toFixed(1)}%`}</b></div><div><span>PAMIĘĆ APLIKACJI</span><b>{stats.appMemory === null ? '—' : `${(stats.appMemory / 1048576).toFixed(0)} MB`}</b></div><div><span>GPU</span><b>{stats.gpu === null ? 'N/D' : `${Math.round(stats.gpu)}%`}</b></div></div></aside>
+    <aside className="queue-panel"><div className="queue-head"><div><span className="eyebrow">PLAYBACK</span><h2><span>NEON</span> QUEUE <small>{queueTracks.length}</small></h2></div><div className="queue-head-actions"><button title="Dodaj pliki" onClick={() => void window.mediaApp.openMedia().then(tracks => addTracks(tracks))}><Plus size={18}/></button><button title="Wyczyść kolejkę" onClick={() => update({ queue: [] })}><X size={17}/></button></div></div><div className="queue-subhead"><span>{state.crossfadeEnabled ? "SET · CROSSFADE " + state.crossfadeSeconds + "s" : "KOLEJKA ODTWARZANIA"}</span><button onClick={saveQueueAsPlaylist}>ZAPISZ JAKO PLAYLISTĘ</button></div><div className="queue-list">{queueTracks.map((track, index) => <div className={`queue-item ${track.id === current?.id ? 'playing' : ''}`} key={`${track.id}-${index}`} onDoubleClick={() => selectTrack(track, true)}><div className="queue-index">{track.id === current?.id ? <span className="playing-bars"><i/><i/><i/></span> : String(index + 1).padStart(2, '0')}</div><button className="queue-cover" onClick={() => selectTrack(track, true)}><span>{track.kind === 'video' ? <Video size={15}/> : track.title.slice(0, 1).toUpperCase()}</span></button><button className="queue-title" onClick={() => selectTrack(track, true)}><b>{track.title}</b><span>{track.artist}{track.bpm ? " · " + Math.round(track.bpm) + " BPM" : ""}</span></button><span className="queue-duration">{formatTime(track.duration ?? 0)}</span><button className="more-button" title="Usuń z kolejki" onClick={() => toggleQueue(track)}><MoreVertical size={16}/></button></div>)}{!queueTracks.length && <div className="queue-empty"><ListMusic size={25}/><b>Kolejka jest pusta</b><span>Dodaj pliki lub wybierz utwór z biblioteki.</span><button onClick={() => void window.mediaApp.openMedia().then(tracks => addTracks(tracks))}><Plus size={14}/> DODAJ PLIKI</button></div>}</div><div className="queue-footer"><span><b>{String(queueTracks.length).padStart(2, '0')}</b> UTWORÓW</span><span>{formatTime(queueTracks.reduce((sum, track) => sum + (track.duration ?? 0), 0))}</span></div><div className="queue-stats"><div><span>CPU APLIKACJI</span><b>{stats.appCpu === null ? '—' : `${stats.appCpu.toFixed(1)}%`}</b></div><div><span>PAMIĘĆ APLIKACJI</span><b>{stats.appMemory === null ? '—' : `${(stats.appMemory / 1048576).toFixed(0)} MB`}</b></div><div><span>GPU</span><b>{stats.gpu === null ? 'N/D' : `${Math.round(stats.gpu)}%`}</b></div></div></aside>
     {notice && <div className="toast"><Check size={15}/>{notice}</div>}
     {playlistDraft && <div className="dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setPlaylistDraft(null) }}><form className="playlist-dialog" onSubmit={event => { event.preventDefault(); confirmPlaylistDraft() }}><span className="eyebrow">PLAYLISTY</span><h2>{playlistDraft.title}</h2><label htmlFor="playlist-name">Nazwa playlisty</label><input id="playlist-name" autoFocus maxLength={80} value={playlistName} onChange={event => setPlaylistName(event.target.value)} placeholder="Wpisz nazwę"/><div className="dialog-actions"><button type="button" className="outline-button" onClick={() => setPlaylistDraft(null)}>ANULUJ</button><button type="submit" className="primary-button" disabled={!playlistName.trim()}>{playlistDraft.title.startsWith('Zapisz kolejkę') ? 'ZAPISZ' : 'UTWÓRZ'}</button></div></form></div>}
   </div>
 }
 
 function TrackRow({ track, index, active, favorite, onPlay, onFavorite, onQueue, onPlaylist }: { track: Track; index: number; active: boolean; favorite: boolean; onPlay: () => void; onFavorite: () => void; onQueue: () => void; onPlaylist: () => void }) {
-  return <div className={`track-row ${active ? 'active' : ''}`} onDoubleClick={onPlay}><span className="row-number">{active ? <AudioLines size={15}/> : String(index + 1).padStart(2, '0')}</span><button className="row-art" onClick={onPlay}>{track.kind === 'video' ? <Video size={16}/> : <Music2 size={16}/>}</button><button className="row-main" onClick={onPlay}><b>{track.title}</b><span>{track.artist}{track.bpm ? " · " + track.bpm + " BPM" : ""}</span></button><span className="format-pill">{track.extension.toUpperCase()}</span><span className="file-size">{track.size ? `${(track.size / 1048576).toFixed(1)} MB` : '—'}</span><div className="row-tools"><button className={favorite ? 'active' : ''} title="Ulubione" onClick={onFavorite}><Heart size={15} fill={favorite ? 'currentColor' : 'none'}/></button><button title="Dodaj do playlisty" onClick={onPlaylist}><ListMusic size={15}/></button><button title="Dodaj/usuń z kolejki" onClick={onQueue}><MoreVertical size={16}/></button></div></div>
+  return <div className={`track-row ${active ? 'active' : ''}`} onDoubleClick={onPlay}><span className="row-number">{active ? <AudioLines size={15}/> : String(index + 1).padStart(2, '0')}</span><button className="row-art" onClick={onPlay}>{track.kind === 'video' ? <Video size={16}/> : <Music2 size={16}/>}</button><button className="row-main" onClick={onPlay}><b>{track.title}</b><span>{track.artist}{track.bpm ? " · " + Math.round(track.bpm) + " BPM" : ""}</span></button><span className="format-pill">{track.extension.toUpperCase()}</span><span className="file-size">{track.size ? `${(track.size / 1048576).toFixed(1)} MB` : '—'}</span><div className="row-tools"><button className={favorite ? 'active' : ''} title="Ulubione" onClick={onFavorite}><Heart size={15} fill={favorite ? 'currentColor' : 'none'}/></button><button title="Dodaj do playlisty" onClick={onPlaylist}><ListMusic size={15}/></button><button title="Dodaj/usuń z kolejki" onClick={onQueue}><MoreVertical size={16}/></button></div></div>
 }
 
 function SettingsPage({ state, stats, onScan, onImport, onPlaybackTempo, onCrossfadeEnabled, onCrossfadeSeconds }: { state: PersistedState; stats: SystemStats; onScan: () => void; onImport: () => void; onPlaybackTempo: (tempo: number) => void; onCrossfadeEnabled: (enabled: boolean) => void; onCrossfadeSeconds: (seconds: number) => void }) {
@@ -651,7 +662,7 @@ function SettingsPage({ state, stats, onScan, onImport, onPlaybackTempo, onCross
         <label className="setting-range"><span>Tempo globalne <b>{Math.round(state.playbackTempo * 100)}%</b></span><input aria-label="Tempo globalne" type="range" min="0.8" max="1.2" step="0.01" value={state.playbackTempo} onChange={event => onPlaybackTempo(Number(event.target.value))}/><small>80% – 120%</small></label>
         <label className="setting-toggle"><input type="checkbox" checked={state.crossfadeEnabled} onChange={event => onCrossfadeEnabled(event.target.checked)}/><span>Włącz crossfade między utworami</span></label>
         <label className={`setting-range ${state.crossfadeEnabled ? '' : 'disabled'}`}><span>Długość przejścia <b>{state.crossfadeSeconds} s</b></span><input aria-label="Długość crossfade" type="range" min="2" max="12" step="1" value={state.crossfadeSeconds} disabled={!state.crossfadeEnabled} onChange={event => onCrossfadeSeconds(Number(event.target.value))}/><small>2 – 12 sekund</small></label>
-        <p>Przejście zaczyna się przed końcem utworu. Gdy oba BPM są znane, tempo następnego utworu jest dopasowywane do bieżącego.</p>
+        <p>Przejście zaczyna się przed końcem utworu. Gdy oba utwory mają analizę BPM, tempo i faza uderzeń następnego utworu są dopasowywane do bieżącego.</p>
       </article>
       <article className="settings-card"><span className="eyebrow">BPM UTWORÓW</span><h3>Analiza playlist</h3><p>Na karcie playlisty wybierz przycisk BPM. Analiza działa lokalnie i zapisuje wykryte tempo przy utworze.</p></article>
       <article className="settings-card wide"><span className="eyebrow">BIBLIOTEKA LOKALNA</span><h3>Obserwowane foldery</h3>{state.folders.map(folder => <div className="folder-line" key={folder}><FolderOpen size={15}/><span>{folder}</span><Check size={14}/></div>)}{!state.folders.length && <p className="muted">Nie dodano jeszcze folderów.</p>}<button className="outline-button" onClick={onScan}><Plus size={15}/> DODAJ FOLDER</button></article>

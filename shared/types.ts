@@ -12,6 +12,7 @@ export interface Track {
   size: number
   addedAt: number
   bpm?: number
+  beatOffset?: number
 }
 
 export interface Playlist {
