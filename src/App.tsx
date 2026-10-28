@@ -28,6 +28,34 @@ function playbackRateFor(track: Track | null | undefined, globalBpm: number) {
   return Math.min(3, Math.max(1 / 3, globalBpm / track.bpm))
 }
 
+function seekAudioTo(media: HTMLAudioElement, time: number) {
+  if (Math.abs(media.currentTime - time) < 0.01 || media.readyState < 1) return Promise.resolve()
+  return new Promise<void>(resolve => {
+    let finished = false
+    const finish = () => {
+      if (finished) return
+      finished = true
+      window.clearTimeout(timeout)
+      media.removeEventListener('seeked', finish)
+      media.removeEventListener('error', finish)
+      resolve()
+    }
+    const timeout = window.setTimeout(finish, 1000)
+    media.addEventListener('seeked', finish, { once: true })
+    media.addEventListener('error', finish, { once: true })
+    try {
+      media.currentTime = time
+      if (!media.seeking) finish()
+    } catch { finish() }
+  })
+}
+
+function secondsUntilNextBeat(media: HTMLAudioElement, bpm: number, beatOffset: number) {
+  const period = 60 / bpm
+  const untilBeat = ((beatOffset - media.currentTime) % period + period) % period
+  return untilBeat / Math.max(0.01, media.playbackRate)
+}
+
 function fromM3U(text: string, sourcePath: string): Track[] {
   const base = sourcePath.slice(0, Math.max(sourcePath.lastIndexOf('/'), sourcePath.lastIndexOf('\\')) + 1)
   return text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => {
@@ -307,16 +335,25 @@ export default function App() {
     transition.outgoing.preservesPitch = true
     transition.incoming.preservesPitch = true
     if (transition.currentTrack.bpm && transition.currentTrack.beatOffset !== undefined && transition.nextTrack.bpm && transition.nextTrack.beatOffset !== undefined) {
-      transition.incoming.currentTime = alignBeatStartTime(
-        transition.outgoing.currentTime,
-        transition.currentTrack.bpm,
-        transition.currentTrack.beatOffset,
-        transition.outgoing.playbackRate,
-        transition.nextTrack.bpm,
-        transition.nextTrack.beatOffset,
-        transition.incoming.playbackRate
-      )
+      if (transition.nextTrack.beatStart !== undefined) {
+        const lastSafeStart = Math.max(0, (transition.incoming.duration || transition.nextTrack.duration || Infinity) - 0.05)
+        await seekAudioTo(transition.incoming, Math.min(transition.nextTrack.beatStart, lastSafeStart))
+        if (transitionRef.current !== transition) return
+        const delay = secondsUntilNextBeat(transition.outgoing, transition.currentTrack.bpm, transition.currentTrack.beatOffset)
+        if (delay > 0.015) await new Promise(resolve => window.setTimeout(resolve, delay * 1000))
+      } else {
+        await seekAudioTo(transition.incoming, alignBeatStartTime(
+          transition.outgoing.currentTime,
+          transition.currentTrack.bpm,
+          transition.currentTrack.beatOffset,
+          transition.outgoing.playbackRate,
+          transition.nextTrack.bpm,
+          transition.nextTrack.beatOffset,
+          transition.incoming.playbackRate
+        ))
+      }
     }
+    if (transitionRef.current !== transition) return
     ensureAudioGraph(transition.incoming)
     try { await transition.incoming.play() }
     catch {
@@ -521,7 +558,7 @@ export default function App() {
             const beatGrid = estimateBeatGrid(audio)
             if (beatGrid) {
               detected++
-              update(currentState => ({ tracks: currentState.tracks.map(item => item.id === track.id ? { ...item, bpm: beatGrid.bpm, beatOffset: beatGrid.beatOffset } : item) }))
+              update(currentState => ({ tracks: currentState.tracks.map(item => item.id === track.id ? { ...item, bpm: beatGrid.bpm, beatOffset: beatGrid.beatOffset, beatStart: beatGrid.beatStart } : item) }))
             } else failed++
           } finally { await context.close() }
         } catch { failed++ }
@@ -686,9 +723,9 @@ function SettingsPage({ state, stats, onScan, onImport, onGlobalBpm, onCrossfade
         <p>Najpierw uruchom analizę BPM playlisty. Pliki bez wykrytego tempa będą odtwarzane z naturalną szybkością.</p>
         <label className="setting-toggle"><input type="checkbox" checked={state.crossfadeEnabled} onChange={event => onCrossfadeEnabled(event.target.checked)}/><span>Włącz crossfade między utworami</span></label>
         <label className={`setting-range ${state.crossfadeEnabled ? '' : 'disabled'}`}><span>Długość przejścia <b>{state.crossfadeSeconds} s</b></span><input aria-label="Długość crossfade" type="range" min="2" max="12" step="1" value={state.crossfadeSeconds} disabled={!state.crossfadeEnabled} onChange={event => onCrossfadeSeconds(Number(event.target.value))}/><small>2 – 12 sekund</small></label>
-        <p>Przejście zaczyna się przed końcem utworu. Po analizie BPM tempo i faza uderzeń obu utworów są dopasowane do globalnego BPM setu.</p>
+        <p>Przejście zaczyna się przed końcem utworu. Po analizie BPM następny utwór startuje na najbliższym wspólnym uderzeniu, a oba decki trzymają globalne BPM.</p>
       </article>
-      <article className="settings-card"><span className="eyebrow">BPM UTWORÓW</span><h3>Analiza playlist</h3><p>Na karcie playlisty wybierz przycisk BPM. Analiza działa lokalnie i zapisuje wykryte tempo przy utworze.</p></article>
+      <article className="settings-card"><span className="eyebrow">BPM UTWORÓW</span><h3>Analiza playlist</h3><p>Na karcie playlisty wybierz przycisk BPM. Analiza działa lokalnie i zapisuje tempo oraz pierwsze mocne uderzenie przy utworze.</p></article>
       <article className="settings-card wide"><span className="eyebrow">BIBLIOTEKA LOKALNA</span><h3>Obserwowane foldery</h3>{state.folders.map(folder => <div className="folder-line" key={folder}><FolderOpen size={15}/><span>{folder}</span><Check size={14}/></div>)}{!state.folders.length && <p className="muted">Nie dodano jeszcze folderów.</p>}<button className="outline-button" onClick={onScan}><Plus size={15}/> DODAJ FOLDER</button></article>
       <article className="settings-card"><span className="eyebrow">ZASOBY SYSTEMOWE</span><h3>Monitoring w czasie rzeczywistym</h3><p>CPU całego systemu: <b>{stats.cpuSystem === null ? 'Brak danych' : `${Math.round(stats.cpuSystem)}%`}</b></p><p>Pamięć fizyczna: <b>{stats.memoryUsed && stats.memoryTotal ? `${(stats.memoryUsed / 1073741824).toFixed(1)} / ${(stats.memoryTotal / 1073741824).toFixed(1)} GB` : 'Brak danych'}</b></p><p>Karta graficzna: <b>{stats.gpuName ?? 'Brak odczytu GPU'}</b></p><p>Wykorzystanie GPU: <b>{stats.gpu === null ? 'N/D' : `${Math.round(stats.gpu)}%`}</b></p></article>
       <article className="settings-card wide"><span className="eyebrow">ZGODNOŚĆ MEDIÓW</span><h3>Typy plików rozpoznawane przez bibliotekę</h3><p>Rzeczywista możliwość odtwarzania zależy od kodeka w pliku i wersji Chromium.</p><div className="format-list">{extensions.map(extension => <span key={extension}>{extension}</span>)}</div></article>

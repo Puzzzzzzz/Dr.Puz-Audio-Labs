@@ -2,6 +2,8 @@ export interface BeatGrid {
   bpm: number
   /** Beat position within the first beat period, measured from the file start. */
   beatOffset: number
+  /** First confidently detected beat after the beginning of the file. */
+  beatStart: number
 }
 
 /** Estimates tempo and the beat phase from changes in short-window audio energy. */
@@ -75,6 +77,8 @@ export function estimateBeatGrid(buffer: AudioBuffer): BeatGrid | null {
   let bestPhaseScore = -1
   const phaseHorizon = Math.min(frameCount, Math.floor(framesPerSecond * 30))
   const beatCount = Math.floor(phaseHorizon / beatPeriodFrames)
+  let strongestOnset = 0
+  for (let frame = 0; frame < phaseHorizon; frame++) strongestOnset = Math.max(strongestOnset, envelope[frame])
   for (let phase = 0; phase < beatPeriodFrames; phase++) {
     let phaseScore = 0
     for (let beat = 0; beat < beatCount; beat++) {
@@ -89,9 +93,21 @@ export function estimateBeatGrid(buffer: AudioBuffer): BeatGrid | null {
     if (phaseScore > bestPhaseScore) { bestPhaseScore = phaseScore; bestPhase = phase }
   }
 
+  let beatStart = bestPhase
+  for (let beat = 0; beat < beatCount; beat++) {
+    const center = Math.round(bestPhase + beat * beatPeriodFrames)
+    let onset = 0
+    for (let nearby = -2; nearby <= 2; nearby++) {
+      const index = center + nearby
+      if (index >= 0 && index < phaseHorizon) onset = Math.max(onset, envelope[index])
+    }
+    if (onset >= strongestOnset * 0.12) { beatStart = center; break }
+  }
+
   return {
     bpm: Math.round(bpm * 100) / 100,
-    beatOffset: bestPhase / framesPerSecond
+    beatOffset: bestPhase / framesPerSecond,
+    beatStart: beatStart / framesPerSecond
   }
 }
 

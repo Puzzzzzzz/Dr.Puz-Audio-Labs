@@ -13,6 +13,7 @@ export interface Track {
   addedAt: number
   bpm?: number
   beatOffset?: number
+  beatStart?: number
 }
 
 export interface Playlist {
