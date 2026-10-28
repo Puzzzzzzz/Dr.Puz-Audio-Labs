@@ -2,8 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { PersistedState, Track, SystemStats } from '../../shared/types'
 
 const mediaApp = {
-  version: () => '0.1.0',
+  version: () => '0.1.3',
   controlWindow: (action: 'minimize' | 'maximize' | 'close') => ipcRenderer.send('window:control', action),
+  setAlwaysOnTop: (enabled: boolean) => ipcRenderer.send('window:always-on-top', enabled),
   openMedia: (): Promise<Track[]> => ipcRenderer.invoke('dialog:open-media'),
   chooseFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:choose-folder'),
   scanFolder: (folder: string): Promise<Track[]> => ipcRenderer.invoke('library:scan', folder),

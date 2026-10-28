@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AudioLines, AudioWaveform, Check, ChevronDown, Disc3, FolderOpen, Heart, Home, ListMusic, Maximize2, MoreVertical, Music2, Pause, Play, Plus, Radio, Repeat, Repeat1, Search, Settings, Shuffle, SkipBack, SkipForward, SlidersHorizontal, Sparkles, Star, Video, Volume2, VolumeX, X } from 'lucide-react'
+import { Activity, AudioLines, AudioWaveform, Check, ChevronDown, Disc3, FolderOpen, Heart, Home, ListMusic, Maximize2, MoreVertical, Music2, Pause, Pin, Play, Plus, Radio, Repeat, Repeat1, Search, Settings, Shuffle, SkipBack, SkipForward, SlidersHorizontal, Sparkles, Star, Video, Volume2, VolumeX, X } from 'lucide-react'
 import type { EqPreset, MediaKind, PersistedState, Playlist, SystemStats, Track } from '../shared/types'
 import { defaultState, makeTrack } from '../shared/types'
 import { formatTime, pathToFileUrl } from '../shared/format'
@@ -69,6 +69,7 @@ export default function App() {
   const update = useCallback((patch: Partial<PersistedState> | ((current: PersistedState) => Partial<PersistedState>)) => {
     setState(currentState => ({ ...currentState, ...(typeof patch === 'function' ? patch(currentState) : patch) }))
   }, [])
+  const toggleAlwaysOnTop = useCallback(() => update(currentState => ({ alwaysOnTop: !currentState.alwaysOnTop })), [update])
 
   useEffect(() => {
     window.mediaApp.loadState().then(saved => {
@@ -85,6 +86,10 @@ export default function App() {
     if (persistTimer.current) window.clearTimeout(persistTimer.current)
     persistTimer.current = window.setTimeout(() => { void window.mediaApp.saveState(state) }, 450)
   }, [ready, state])
+
+  useEffect(() => {
+    if (ready) window.mediaApp.setAlwaysOnTop(state.alwaysOnTop)
+  }, [ready, state.alwaysOnTop])
 
   useEffect(() => {
     let active = true
@@ -334,6 +339,7 @@ export default function App() {
       <div className="top-audio-status"><AudioLines size={17} className="cyan"/><div className="mini-spectrum">{Array.from({ length: 15 }, (_, i) => <i key={i} style={{ height: `${7 + (i * 11 % 15)}px` }} />)}</div><span>{current ? 'AUDIO READY' : 'GOTOWY'}</span><span className="status-dot" /></div>
       <div className="top-spacer" />
       <button className="icon-button" title="Ustawienia" onClick={() => setPage('settings')}><Settings size={17}/></button>
+      <button className={`icon-button pin-button ${state.alwaysOnTop ? 'active' : ''}`} title={`Zawsze na wierzchu: ${state.alwaysOnTop ? 'włączone' : 'wyłączone'}`} aria-label="Przełącz zawsze na wierzchu" aria-pressed={state.alwaysOnTop} onClick={toggleAlwaysOnTop}><Pin size={17}/></button>
       <div className="window-controls"><button aria-label="Minimalizuj" onClick={() => window.mediaApp.controlWindow('minimize')}>—</button><button aria-label="Maksymalizuj" onClick={() => window.mediaApp.controlWindow('maximize')}>□</button><button aria-label="Zamknij" onClick={() => window.mediaApp.controlWindow('close')}>×</button></div>
     </header>
 

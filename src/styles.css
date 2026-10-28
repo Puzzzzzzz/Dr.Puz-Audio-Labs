@@ -29,3 +29,19 @@
 @media(max-height:800px){.eq-band input{min-height:45px}}
 
 .topbar{-webkit-app-region:drag}.topbar button,.topbar .window-controls{-webkit-app-region:no-drag}.window-controls{display:flex;gap:0;margin-left:20px}.window-controls button{display:grid;place-items:center;width:42px;height:34px;border:0;background:transparent;color:#9cacbc;font-size:16px}.window-controls button:hover{background:#172337;color:#fff}.window-controls button:last-child:hover{background:#b62247;color:white}.window-controls span{display:none}
+
+body,.app-shell{min-height:0}
+.pin-button{margin-left:8px}
+.icon-button.active{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px #14e8fa30}
+@media(max-height:700px){
+  .workspace{gap:8px;padding-bottom:8px}
+  .player-dock{height:78px}
+  .dock-bottom{height:42px}
+  .now-playing-info{min-height:68px;padding-top:5px;padding-bottom:5px}
+  .cover-art{width:54px;height:54px}
+  .visual-panel{min-height:130px}
+  .eq-inline{height:130px}
+  .stage-now .visual-panel+.eq-inline{margin-top:8px}
+  .eq-card{padding:8px 11px 6px}
+  .eq-band input{min-height:38px}
+}

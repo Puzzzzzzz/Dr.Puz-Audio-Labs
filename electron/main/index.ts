@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import { existsSync, promises as fs, watch, type FSWatcher } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import * as si from 'systeminformation'
@@ -58,6 +58,9 @@ function registerIpc() {
     else if (action === 'maximize') mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize()
     else if (action === 'close') mainWindow.close()
   })
+  ipcMain.on('window:always-on-top', (_event, enabled: unknown) => {
+    if (typeof enabled === 'boolean' && mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(enabled)
+  })
   ipcMain.handle('dialog:open-media', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'Media', extensions: MEDIA_EXTENSIONS }] })
     return result.canceled ? [] : Promise.all(result.filePaths.map(async path => {
@@ -114,9 +117,15 @@ function registerIpc() {
 }
 
 function createWindow() {
+  const { workArea } = screen.getPrimaryDisplay()
+  const width = Math.min(1600, workArea.width)
+  const height = Math.min(960, workArea.height)
   mainWindow = new BrowserWindow({
-    width: 1600, height: 960, minWidth: 1120, minHeight: 720, frame: false,
+    x: workArea.x + Math.max(0, Math.floor((workArea.width - width) / 2)),
+    y: workArea.y + Math.max(0, Math.floor((workArea.height - height) / 2)),
+    width, height, minWidth: Math.min(1120, workArea.width), minHeight: Math.min(600, workArea.height), frame: false,
     backgroundColor: '#050713', title: 'Dr.Puz Audio Lab', autoHideMenuBar: true,
+    alwaysOnTop: readState().alwaysOnTop,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true, nodeIntegration: false, sandbox: true

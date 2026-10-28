@@ -39,6 +39,7 @@ export interface PersistedState {
   customPresets: EqPreset[]
   shuffle: boolean
   repeat: 'off' | 'all' | 'one'
+  alwaysOnTop: boolean
 }
 
 export interface SystemStats {
@@ -54,6 +55,7 @@ export interface SystemStats {
 export interface MediaAppApi {
   version: () => string
   controlWindow: (action: 'minimize' | 'maximize' | 'close') => void
+  setAlwaysOnTop: (enabled: boolean) => void
   openMedia: () => Promise<Track[]>
   chooseFolder: () => Promise<string | null>
   scanFolder: (folder: string) => Promise<Track[]>
@@ -90,5 +92,5 @@ export function makeTrack(path: string, size = 0, addedAt = Date.now()): Track {
 export const defaultState: PersistedState = {
   folders: [], tracks: [], playlists: [], favorites: [], queue: [], currentTrackId: null,
   currentTime: 0, volume: 0.78, eqValues: Array(10).fill(0), eqPreset: 'Płaski',
-  customPresets: [], shuffle: false, repeat: 'off'
+  customPresets: [], shuffle: false, repeat: 'off', alwaysOnTop: false
 }
