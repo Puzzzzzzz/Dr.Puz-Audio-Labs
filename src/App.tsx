@@ -301,6 +301,11 @@ export default function App() {
   const startTransitionPlayback = useCallback(async (transition: CrossfadeTransition) => {
     if (transitionRef.current !== transition || transition.started || transition.incoming.readyState < 2) return
     transition.started = true
+    const globalBpm = latestStateRef.current.globalBpm
+    transition.outgoing.playbackRate = playbackRateFor(transition.currentTrack, globalBpm)
+    transition.incoming.playbackRate = playbackRateFor(transition.nextTrack, globalBpm)
+    transition.outgoing.preservesPitch = true
+    transition.incoming.preservesPitch = true
     if (transition.currentTrack.bpm && transition.currentTrack.beatOffset !== undefined && transition.nextTrack.bpm && transition.nextTrack.beatOffset !== undefined) {
       transition.incoming.currentTime = alignBeatStartTime(
         transition.outgoing.currentTime,
@@ -357,6 +362,13 @@ export default function App() {
 
   const selectTrack = useCallback((track: Track, autoplay = false) => {
     cancelCrossfade()
+    if (track.kind === 'audio') {
+      const media = getActiveAudioElement()
+      if (media) {
+        media.playbackRate = playbackRateFor(track, latestStateRef.current.globalBpm)
+        media.preservesPitch = true
+      }
+    }
     update(currentState => ({
       tracks: currentState.tracks.some(item => item.id === track.id) ? currentState.tracks : [...currentState.tracks, track],
       queue: currentState.queue.includes(track.id) ? currentState.queue : [...currentState.queue, track.id],
@@ -364,7 +376,7 @@ export default function App() {
     }))
     pendingPlayRef.current = autoplay
     setNow(0)
-  }, [cancelCrossfade, update])
+  }, [cancelCrossfade, getActiveAudioElement, update])
 
   const togglePlayback = useCallback(async () => {
     const media = isVideo ? videoRef.current : getActiveAudioElement()
@@ -433,6 +445,10 @@ export default function App() {
     if (media && transition?.incoming === media) { void startTransitionPlayback(transition); return }
     const activeMedia = isVideo ? videoRef.current : getActiveAudioElement()
     if (media && media !== activeMedia) return
+    if (!isVideo && current && activeMedia) {
+      activeMedia.playbackRate = playbackRateFor(current, latestStateRef.current.globalBpm)
+      activeMedia.preservesPitch = true
+    }
     if (pendingPlayRef.current) { pendingPlayRef.current = false; ensureAudioGraph(activeMedia); void activeMedia?.play().catch(() => setError('Nie udało się odtworzyć pliku. Sprawdź obsługiwany format.')) }
   }
 
