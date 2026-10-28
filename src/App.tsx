@@ -50,6 +50,8 @@ export default function App() {
   const [subtitleName, setSubtitleName] = useState('')
   const [now, setNow] = useState(0)
   const [analyzingPlaylistId, setAnalyzingPlaylistId] = useState<string | null>(null)
+  const [playlistDraft, setPlaylistDraft] = useState<{ title: string; trackIds: string[] } | null>(null)
+  const [playlistName, setPlaylistName] = useState('')
   const audioRef = useRef<HTMLAudioElement>(null)
   const secondAudioRef = useRef<HTMLAudioElement>(null)
   const [activeAudioDeck, setActiveAudioDeck] = useState<AudioDeck>(0)
@@ -518,16 +520,22 @@ export default function App() {
   }
 
   const makePlaylist = () => {
-    const name = window.prompt('Nazwa nowej playlisty')
-    if (!name?.trim()) return
-    update(currentState => ({ playlists: [...currentState.playlists, { id: crypto.randomUUID(), name: name.trim(), trackIds: [], updatedAt: Date.now() }] }))
+    setPlaylistName('')
+    setPlaylistDraft({ title: 'Nowa playlista', trackIds: [] })
   }
 
   const saveQueueAsPlaylist = () => {
     if (!state.queue.length) { setNotice('Dodaj utwory do kolejki przed zapisaniem playlisty'); window.setTimeout(() => setNotice(''), 2500); return }
-    const name = window.prompt('Nazwa playlisty z bieżącej kolejki')
-    if (!name?.trim()) return
-    update(currentState => ({ playlists: [...currentState.playlists, { id: crypto.randomUUID(), name: name.trim(), trackIds: [...currentState.queue], updatedAt: Date.now() }] }))
+    setPlaylistName('')
+    setPlaylistDraft({ title: 'Zapisz kolejkę jako playlistę', trackIds: [...state.queue] })
+  }
+
+  const confirmPlaylistDraft = () => {
+    const name = playlistName.trim()
+    if (!playlistDraft || !name) return
+    update(currentState => ({ playlists: [...currentState.playlists, { id: crypto.randomUUID(), name, trackIds: playlistDraft.trackIds, updatedAt: Date.now() }] }))
+    setPlaylistDraft(null)
+    setPlaylistName('')
     setPage('playlists')
   }
 
@@ -625,6 +633,7 @@ export default function App() {
 
     <aside className="queue-panel"><div className="queue-head"><div><span className="eyebrow">PLAYBACK</span><h2><span>NEON</span> QUEUE <small>{queueTracks.length}</small></h2></div><div className="queue-head-actions"><button title="Dodaj pliki" onClick={() => void window.mediaApp.openMedia().then(tracks => addTracks(tracks))}><Plus size={18}/></button><button title="Wyczyść kolejkę" onClick={() => update({ queue: [] })}><X size={17}/></button></div></div><div className="queue-subhead"><span>{state.crossfadeEnabled ? "SET · CROSSFADE " + state.crossfadeSeconds + "s" : "KOLEJKA ODTWARZANIA"}</span><button onClick={saveQueueAsPlaylist}>ZAPISZ JAKO PLAYLISTĘ</button></div><div className="queue-list">{queueTracks.map((track, index) => <div className={`queue-item ${track.id === current?.id ? 'playing' : ''}`} key={`${track.id}-${index}`} onDoubleClick={() => selectTrack(track, true)}><div className="queue-index">{track.id === current?.id ? <span className="playing-bars"><i/><i/><i/></span> : String(index + 1).padStart(2, '0')}</div><button className="queue-cover" onClick={() => selectTrack(track, true)}><span>{track.kind === 'video' ? <Video size={15}/> : track.title.slice(0, 1).toUpperCase()}</span></button><button className="queue-title" onClick={() => selectTrack(track, true)}><b>{track.title}</b><span>{track.artist}{track.bpm ? " · " + track.bpm + " BPM" : ""}</span></button><span className="queue-duration">{formatTime(track.duration ?? 0)}</span><button className="more-button" title="Usuń z kolejki" onClick={() => toggleQueue(track)}><MoreVertical size={16}/></button></div>)}{!queueTracks.length && <div className="queue-empty"><ListMusic size={25}/><b>Kolejka jest pusta</b><span>Dodaj pliki lub wybierz utwór z biblioteki.</span><button onClick={() => void window.mediaApp.openMedia().then(tracks => addTracks(tracks))}><Plus size={14}/> DODAJ PLIKI</button></div>}</div><div className="queue-footer"><span><b>{String(queueTracks.length).padStart(2, '0')}</b> UTWORÓW</span><span>{formatTime(queueTracks.reduce((sum, track) => sum + (track.duration ?? 0), 0))}</span></div><div className="queue-stats"><div><span>CPU APLIKACJI</span><b>{stats.appCpu === null ? '—' : `${stats.appCpu.toFixed(1)}%`}</b></div><div><span>PAMIĘĆ APLIKACJI</span><b>{stats.appMemory === null ? '—' : `${(stats.appMemory / 1048576).toFixed(0)} MB`}</b></div><div><span>GPU</span><b>{stats.gpu === null ? 'N/D' : `${Math.round(stats.gpu)}%`}</b></div></div></aside>
     {notice && <div className="toast"><Check size={15}/>{notice}</div>}
+    {playlistDraft && <div className="dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setPlaylistDraft(null) }}><form className="playlist-dialog" onSubmit={event => { event.preventDefault(); confirmPlaylistDraft() }}><span className="eyebrow">PLAYLISTY</span><h2>{playlistDraft.title}</h2><label htmlFor="playlist-name">Nazwa playlisty</label><input id="playlist-name" autoFocus maxLength={80} value={playlistName} onChange={event => setPlaylistName(event.target.value)} placeholder="Wpisz nazwę"/><div className="dialog-actions"><button type="button" className="outline-button" onClick={() => setPlaylistDraft(null)}>ANULUJ</button><button type="submit" className="primary-button" disabled={!playlistName.trim()}>{playlistDraft.title.startsWith('Zapisz kolejkę') ? 'ZAPISZ' : 'UTWÓRZ'}</button></div></form></div>}
   </div>
 }
 
