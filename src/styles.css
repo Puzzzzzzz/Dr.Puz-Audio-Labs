@@ -20,4 +20,12 @@
 .eq-expanded{overflow:auto}
 @media(max-height:800px){.eq-inline{height:170px}.eq-band input{height:66px}}
 
+/* Separate the home visualization from its compact equalizer card. */
+.stage-now .visual-panel+.eq-inline{margin-top:12px}
+.eq-expanded .eq-card{flex:1 1 auto;min-height:0}
+.eq-sliders{align-items:stretch}
+.eq-band{display:grid;grid-template-rows:auto minmax(54px,1fr) auto;align-content:stretch;justify-items:center;gap:4px;height:100%}
+.eq-band input{height:100%;min-height:54px;max-height:none;align-self:stretch}
+@media(max-height:800px){.eq-band input{min-height:45px}}
+
 .topbar{-webkit-app-region:drag}.topbar button,.topbar .window-controls{-webkit-app-region:no-drag}.window-controls{display:flex;gap:0;margin-left:20px}.window-controls button{display:grid;place-items:center;width:42px;height:34px;border:0;background:transparent;color:#9cacbc;font-size:16px}.window-controls button:hover{background:#172337;color:#fff}.window-controls button:last-child:hover{background:#b62247;color:white}.window-controls span{display:none}

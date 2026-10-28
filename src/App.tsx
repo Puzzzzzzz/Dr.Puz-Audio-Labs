@@ -347,7 +347,7 @@ export default function App() {
     </aside>
 
     <main className="workspace">
-      <section className="stage">
+      <section className={`stage stage-${page}`}>
         <div className="stage-head"><div className="breadcrumbs"><span>DR.PUZ AUDIO LAB</span><i>/</i><b>{NAV.find(item => item.id === page)?.label.toUpperCase()}</b></div><div className="stage-actions"><button className="outline-button" onClick={() => void window.mediaApp.openMedia().then(tracks => addTracks(tracks))}><Plus size={16}/> DODAJ PLIKI</button><button className="square-button" title="Skanuj folder" onClick={() => void scanLibraryFolder()}><FolderOpen size={17}/></button></div></div>
 
         {page === 'library' || page === 'favorites' ? <section className="library-page">
