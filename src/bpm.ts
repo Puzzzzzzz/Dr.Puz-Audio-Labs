@@ -50,6 +50,15 @@ export function estimateBpm(buffer: AudioBuffer): number | null {
   const nextScore = scores[Math.min(maxLag, bestLag + 1)]
   const curvature = previousScore - 2 * bestScore + nextScore
   const offset = curvature ? Math.max(-0.5, Math.min(0.5, 0.5 * (previousScore - nextScore) / curvature)) : 0
-  const bpm = 60 * framesPerSecond / (bestLag + offset)
+  let bpm = 60 * framesPerSecond / (bestLag + offset)
+
+  // Autocorrelation often locks onto every other beat in half-time music.
+  // If the faster octave has a clear pulse of its own, prefer that beat grid.
+  const fasterBpm = bpm * 2
+  const fasterLag = Math.round(bestLag / 2)
+  if (bpm < 90 && fasterBpm <= 180 && fasterLag >= minLag && scores[fasterLag] >= bestScore * 0.45) {
+    bpm = fasterBpm
+  }
+
   return bpm >= 60 && bpm <= 180 ? Math.round(bpm) : null
 }

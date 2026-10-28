@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { PersistedState, Track, SystemStats } from '../../shared/types'
 
 const mediaApp = {
-  version: () => '0.1.5',
+  version: () => '0.1.6',
   controlWindow: (action: 'minimize' | 'maximize' | 'close') => ipcRenderer.send('window:control', action),
   setAlwaysOnTop: (enabled: boolean) => ipcRenderer.send('window:always-on-top', enabled),
   readAudioFile: (path: string): Promise<Uint8Array> => ipcRenderer.invoke('media:read-audio', path),

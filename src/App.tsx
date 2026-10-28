@@ -478,7 +478,6 @@ export default function App() {
         const track = tracks[index]
         setNotice(`Analiza tempa ${index + 1}/${tracks.length} · ${track.title}`)
         try {
-          if (track.bpm) { detected++; continue }
           const bytes = await window.mediaApp.readAudioFile(track.path)
           const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
           if (!AudioContextClass) throw new Error('Web Audio niedostępne')
