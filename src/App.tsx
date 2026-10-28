@@ -23,6 +23,11 @@ const EMPTY_STATS: SystemStats = { cpuSystem: null, memoryUsed: null, memoryTota
 type AudioDeck = 0 | 1
 interface CrossfadeTransition { outgoing: HTMLAudioElement; incoming: HTMLAudioElement; currentTrack: Track; nextTrack: Track; nextDeck: AudioDeck; startedAt: number; duration: number; frame: number | null; started: boolean }
 
+function playbackRateFor(track: Track | null | undefined, globalBpm: number) {
+  if (!track || track.kind !== 'audio' || !track.bpm) return 1
+  return Math.min(3, Math.max(1 / 3, globalBpm / track.bpm))
+}
+
 function fromM3U(text: string, sourcePath: string): Track[] {
   const base = sourcePath.slice(0, Math.max(sourcePath.lastIndexOf('/'), sourcePath.lastIndexOf('\\')) + 1)
   return text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => {
@@ -91,7 +96,13 @@ export default function App() {
 
   useEffect(() => {
     window.mediaApp.loadState().then(saved => {
-      const restored = { ...defaultState, ...saved, currentTime: saved.currentTime || 0 }
+      const { playbackTempo: legacyTempo, ...savedState } = saved as PersistedState & { playbackTempo?: number }
+      const restored = {
+        ...defaultState,
+        ...savedState,
+        globalBpm: Number.isFinite(savedState.globalBpm) ? savedState.globalBpm : Math.round(120 * (legacyTempo ?? 1)),
+        currentTime: saved.currentTime || 0
+      }
       setState(restored)
       setReady(true)
       if (restored.folders.length) window.mediaApp.watchFolders(restored.folders)
@@ -143,7 +154,7 @@ export default function App() {
     if (inactiveAudio) { inactiveAudio.pause(); inactiveAudio.removeAttribute('src'); inactiveAudio.load() }
     if (activeMedia) {
       activeMedia.volume = state.volume
-      activeMedia.playbackRate = state.playbackTempo
+      activeMedia.playbackRate = playbackRateFor(current.kind === 'audio' ? current : null, state.globalBpm)
       activeMedia.preservesPitch = true
       if (current.kind === 'audio' && promotedDeckRef.current === activeAudioDeck) promotedDeckRef.current = null
       else {
@@ -200,15 +211,14 @@ export default function App() {
 
   useEffect(() => {
     const media = isVideo ? videoRef.current : getActiveAudioElement()
-    if (media) { media.playbackRate = state.playbackTempo; media.preservesPitch = true }
+    if (media) { media.playbackRate = playbackRateFor(current, state.globalBpm); media.preservesPitch = true }
     const transition = transitionRef.current
     if (transition) {
-      const rate = current?.bpm && transition.nextTrack.bpm ? state.playbackTempo * current.bpm / transition.nextTrack.bpm : state.playbackTempo
-      transition.outgoing.playbackRate = state.playbackTempo
-      transition.incoming.playbackRate = Math.min(1.5, Math.max(0.5, rate))
+      transition.outgoing.playbackRate = playbackRateFor(transition.currentTrack, state.globalBpm)
+      transition.incoming.playbackRate = playbackRateFor(transition.nextTrack, state.globalBpm)
       transition.incoming.preservesPitch = true
     }
-  }, [activeAudioDeck, current?.bpm, current?.id, getActiveAudioElement, isVideo, state.playbackTempo])
+  }, [activeAudioDeck, current?.bpm, current?.id, getActiveAudioElement, isVideo, state.globalBpm])
 
   const addTracks = useCallback((tracks: Track[], enqueue = true) => {
     if (!tracks.length) return
@@ -331,12 +341,9 @@ export default function App() {
     const incoming = getInactiveAudioElement()
     if (!outgoing || !incoming || !current || nextTrack.kind !== 'audio') return
     cancelCrossfade()
-    const currentBpm = current?.bpm
-    const nextBpm = nextTrack.bpm
-    const beatMatchRate = currentBpm && nextBpm ? state.playbackTempo * currentBpm / nextBpm : state.playbackTempo
     incoming.pause()
     incoming.volume = 0
-    incoming.playbackRate = Math.min(1.5, Math.max(0.5, beatMatchRate))
+    incoming.playbackRate = playbackRateFor(nextTrack, state.globalBpm)
     incoming.preservesPitch = true
     incoming.currentTime = 0
     incoming.src = pathToFileUrl(nextTrack.path)
@@ -346,7 +353,7 @@ export default function App() {
     transitionRef.current = transition
     ensureAudioGraph(incoming)
     if (incoming.readyState >= 2) void startTransitionPlayback(transition)
-  }, [cancelCrossfade, current, ensureAudioGraph, getActiveAudioElement, getInactiveAudioElement, startTransitionPlayback, state.playbackTempo])
+  }, [cancelCrossfade, current, ensureAudioGraph, getActiveAudioElement, getInactiveAudioElement, startTransitionPlayback, state.globalBpm])
 
   const selectTrack = useCallback((track: Track, autoplay = false) => {
     cancelCrossfade()
@@ -616,7 +623,7 @@ export default function App() {
         </section> : page === 'playlists' ? <section className="library-page">
           <div className="page-title-row"><div><span className="eyebrow">TWOJE ZESTAWY</span><h1>Playlisty</h1><p>Listy są przechowywane lokalnie na tym komputerze.</p></div><div className="row-actions"><button className="outline-button" onClick={() => void importM3U()}><FolderOpen size={15}/> IMPORT M3U</button><button className="primary-button" onClick={makePlaylist}><Plus size={16}/> Nowa playlista</button></div></div>
           <div className="playlist-grid">{state.playlists.map(playlist => <article className="playlist-card" key={playlist.id}><div className="playlist-art"><ListMusic size={27}/><span>{String(playlist.trackIds.length).padStart(2, '0')}</span></div><div className="playlist-info"><b>{playlist.name}</b><small>{playlist.trackIds.length} utworów</small><button className="playlist-analyze" disabled={analyzingPlaylistId!==null} onClick={() => void analyzePlaylistBpm(playlist)}>{analyzingPlaylistId === playlist.id ? "ANALIZA…" : "BPM " + playlist.trackIds.filter(id => state.tracks.find(track => track.id === id)?.bpm).length + "/" + playlist.trackIds.length}</button></div><button className="icon-button" title="Eksportuj playlistę M3U" onClick={() => void exportM3U(playlist)}><MoreVertical size={17}/></button><button className="play-overlay" title="Odtwórz playlistę" onClick={() => { const track = state.tracks.find(item => item.id === playlist.trackIds[0]); if (track) { update({ queue: [...playlist.trackIds] }); selectTrack(track, true) } }}><Play size={17} fill="currentColor"/></button></article>)}{!state.playlists.length && <div className="empty-state"><ListMusic size={28}/><b>Brak playlist</b><span>Utwórz nową listę albo zaimportuj plik M3U.</span></div>}</div>
-        </section> : page === 'settings' ? <SettingsPage state={state} stats={stats} onScan={() => void scanLibraryFolder()} onImport={() => void importM3U()} onPlaybackTempo={playbackTempo => update({ playbackTempo })} onCrossfadeEnabled={crossfadeEnabled => update({ crossfadeEnabled })} onCrossfadeSeconds={crossfadeSeconds => update({ crossfadeSeconds })} /> : <>
+        </section> : page === 'settings' ? <SettingsPage state={state} stats={stats} onScan={() => void scanLibraryFolder()} onImport={() => void importM3U()} onGlobalBpm={globalBpm => update({ globalBpm })} onCrossfadeEnabled={crossfadeEnabled => update({ crossfadeEnabled })} onCrossfadeSeconds={crossfadeSeconds => update({ crossfadeSeconds })} /> : <>
           {page === 'now' && <div className="now-playing-info"><div className="cover-art"><Disc3 size={34}/><span>{cover}</span></div><div className="track-meta"><span className="eyebrow">{current?.kind === 'video' ? 'TERAZ OGLĄDASZ' : 'TERAZ ODTWARZANE'}</span><h1>{current?.title ?? 'Wybierz coś do odtworzenia'}</h1><p>{current?.artist ?? 'Dodaj pliki lub folder do swojej biblioteki'}</p><div className="file-badges">{current && <><span>{current.extension.toUpperCase()}</span><span>{current.size ? `${(current.size / 1048576).toFixed(1)} MB` : 'LOCAL'}</span></>}</div></div><div className="track-stat"><span>JAKOŚĆ ŹRÓDŁA</span><b>{current ? current.extension.toUpperCase() : '—'}</b><small>LOKALNY PLIK</small></div></div>}
           {page === 'visualizer' && <div className="visual-page-header"><div><span className="eyebrow">SYNCHRONIZACJA W CZASIE RZECZYWISTYM</span><h1>Laboratorium wizualizacji</h1></div><span className="visual-live"><i/> LIVE AUDIO INPUT</span></div>}
           {page === 'equalizer' && <div className="visual-page-header"><div><span className="eyebrow">PRECYZYJNA KOREKCJA CZĘSTOTLIWOŚCI</span><h1>Equalizer</h1></div><span className="visual-live"><i/> {state.eqPreset.toUpperCase()}</span></div>}
@@ -651,18 +658,19 @@ function TrackRow({ track, index, active, favorite, onPlay, onFavorite, onQueue,
   return <div className={`track-row ${active ? 'active' : ''}`} onDoubleClick={onPlay}><span className="row-number">{active ? <AudioLines size={15}/> : String(index + 1).padStart(2, '0')}</span><button className="row-art" onClick={onPlay}>{track.kind === 'video' ? <Video size={16}/> : <Music2 size={16}/>}</button><button className="row-main" onClick={onPlay}><b>{track.title}</b><span>{track.artist}{track.bpm ? " · " + Math.round(track.bpm) + " BPM" : ""}</span></button><span className="format-pill">{track.extension.toUpperCase()}</span><span className="file-size">{track.size ? `${(track.size / 1048576).toFixed(1)} MB` : '—'}</span><div className="row-tools"><button className={favorite ? 'active' : ''} title="Ulubione" onClick={onFavorite}><Heart size={15} fill={favorite ? 'currentColor' : 'none'}/></button><button title="Dodaj do playlisty" onClick={onPlaylist}><ListMusic size={15}/></button><button title="Dodaj/usuń z kolejki" onClick={onQueue}><MoreVertical size={16}/></button></div></div>
 }
 
-function SettingsPage({ state, stats, onScan, onImport, onPlaybackTempo, onCrossfadeEnabled, onCrossfadeSeconds }: { state: PersistedState; stats: SystemStats; onScan: () => void; onImport: () => void; onPlaybackTempo: (tempo: number) => void; onCrossfadeEnabled: (enabled: boolean) => void; onCrossfadeSeconds: (seconds: number) => void }) {
+function SettingsPage({ state, stats, onScan, onImport, onGlobalBpm, onCrossfadeEnabled, onCrossfadeSeconds }: { state: PersistedState; stats: SystemStats; onScan: () => void; onImport: () => void; onGlobalBpm: (bpm: number) => void; onCrossfadeEnabled: (enabled: boolean) => void; onCrossfadeSeconds: (seconds: number) => void }) {
   const extensions = ['MP3','WAV','FLAC','M4A','AAC','OGG','OPUS','WMA','AIFF','MP4','WEBM','MOV','MKV','AVI','WMV']
   return <section className="library-page settings-page">
     <div className="page-title-row"><div><span className="eyebrow">KONFIGURACJA APLIKACJI</span><h1>Ustawienia</h1><p>Biblioteka, tempo i miksowanie utworów.</p></div></div>
     <div className="settings-grid">
       <article className="settings-card wide set-settings">
         <span className="eyebrow">ODTWARZANIE SETU</span><h3>Tempo i crossfade</h3>
-        <p>Globalne tempo zmienia szybkość wszystkich utworów. Wysokość dźwięku pozostaje zachowana.</p>
-        <label className="setting-range"><span>Tempo globalne <b>{Math.round(state.playbackTempo * 100)}%</b></span><input aria-label="Tempo globalne" type="range" min="0.8" max="1.2" step="0.01" value={state.playbackTempo} onChange={event => onPlaybackTempo(Number(event.target.value))}/><small>80% – 120%</small></label>
+        <p>Ustaw docelowe BPM setu. Każdy utwór z wykrytym BPM otrzyma własną szybkość odtwarzania; wysokość dźwięku pozostaje zachowana.</p>
+        <label className="setting-range"><span>Globalne BPM <b>{state.globalBpm} BPM</b></span><input aria-label="Globalne BPM" type="range" min="60" max="180" step="1" value={state.globalBpm} onChange={event => onGlobalBpm(Number(event.target.value))}/><small>60–180 BPM</small></label>
+        <p>Najpierw uruchom analizę BPM playlisty. Pliki bez wykrytego tempa będą odtwarzane z naturalną szybkością.</p>
         <label className="setting-toggle"><input type="checkbox" checked={state.crossfadeEnabled} onChange={event => onCrossfadeEnabled(event.target.checked)}/><span>Włącz crossfade między utworami</span></label>
         <label className={`setting-range ${state.crossfadeEnabled ? '' : 'disabled'}`}><span>Długość przejścia <b>{state.crossfadeSeconds} s</b></span><input aria-label="Długość crossfade" type="range" min="2" max="12" step="1" value={state.crossfadeSeconds} disabled={!state.crossfadeEnabled} onChange={event => onCrossfadeSeconds(Number(event.target.value))}/><small>2 – 12 sekund</small></label>
-        <p>Przejście zaczyna się przed końcem utworu. Gdy oba utwory mają analizę BPM, tempo i faza uderzeń następnego utworu są dopasowywane do bieżącego.</p>
+        <p>Przejście zaczyna się przed końcem utworu. Po analizie BPM tempo i faza uderzeń obu utworów są dopasowane do globalnego BPM setu.</p>
       </article>
       <article className="settings-card"><span className="eyebrow">BPM UTWORÓW</span><h3>Analiza playlist</h3><p>Na karcie playlisty wybierz przycisk BPM. Analiza działa lokalnie i zapisuje wykryte tempo przy utworze.</p></article>
       <article className="settings-card wide"><span className="eyebrow">BIBLIOTEKA LOKALNA</span><h3>Obserwowane foldery</h3>{state.folders.map(folder => <div className="folder-line" key={folder}><FolderOpen size={15}/><span>{folder}</span><Check size={14}/></div>)}{!state.folders.length && <p className="muted">Nie dodano jeszcze folderów.</p>}<button className="outline-button" onClick={onScan}><Plus size={15}/> DODAJ FOLDER</button></article>

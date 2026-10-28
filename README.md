@@ -30,8 +30,8 @@ Instalator NSIS trafia do katalogu `release/`. Aplikacja zapisuje bibliotekę, k
 ## Odtwarzanie jako set
 
 - Na karcie playlisty wybierz przycisk BPM, aby lokalnie oszacować tempo jej utworów. Każde uruchomienie ponownie przelicza pliki, a detektor koryguje częste wskazania half-time, gdy puls w podwójnym tempie ma wystarczająco mocny sygnał.
-- W Ustawieniach ustaw globalne tempo w zakresie 80–120%; aplikacja zachowuje wysokość dźwięku.
-- Włącz crossfade i ustaw przejście od 2 do 12 sekund. Miksowanie działa dla kolejnych utworów audio w kolejce; przy analizowanych BPM tempo oraz faza uderzeń są dopasowywane, aby wyrównać rytm na początku przejścia.
+- W Ustawieniach wybierz docelowe tempo setu w zakresie 60–180 BPM. Dla utworów z analizowanym BPM aplikacja dobiera indywidualną szybkość odtwarzania i zachowuje wysokość dźwięku.
+- Włącz crossfade i ustaw przejście od 2 do 12 sekund. Miksowanie działa dla kolejnych utworów audio w kolejce; przy analizowanych BPM tempo oraz faza uderzeń są dopasowywane do globalnego BPM setu.
 - Analiza BPM wymaga dekodowalnego pliku audio do 256 MB. Nieobsługiwany plik pozostaje bez wyniku BPM.
 
 ## Kodeki i formaty
