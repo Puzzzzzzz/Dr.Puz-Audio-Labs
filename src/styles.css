@@ -59,3 +59,11 @@ body,.app-shell{min-height:0}
 .setting-toggle input{accent-color:var(--pink)}
 .set-settings{grid-column:span 2}
 .dialog-backdrop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;background:#02050bd9;backdrop-filter:blur(5px)}.playlist-dialog{display:flex;flex-direction:column;gap:10px;width:min(400px,100%);padding:23px;border:1px solid #164653;border-radius:9px;background:linear-gradient(145deg,#101a2b,#090e19);box-shadow:0 20px 70px #000a}.playlist-dialog .eyebrow{color:var(--cyan);font-size:9px;letter-spacing:1px}.playlist-dialog h2{margin:0 0 5px;color:#e8f3ff;font-size:18px}.playlist-dialog label{color:#9aabc0;font-size:11px}.playlist-dialog input{height:38px;padding:0 11px;border:1px solid #29394d;border-radius:5px;outline:none;background:#070d17;color:#eff8ff;font-size:12px}.playlist-dialog input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px #00d9ef22}.playlist-dialog input::placeholder{color:#64748a}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.dialog-actions button{min-height:34px}.dialog-actions .primary-button:disabled{opacity:.45;cursor:not-allowed}
+.stage-now{display:grid;grid-template-rows:49px minmax(86px,auto) minmax(110px,1fr) clamp(128px,21vh,185px);row-gap:10px}
+.stage-now .stage-head{height:auto;min-height:49px}
+.stage-now .now-playing-info{min-height:0}
+.stage-now .visual-panel{min-height:0;flex:none}
+.stage-now .eq-inline{width:100%;height:auto;min-height:0;flex:none;margin:0}
+.stage-now .eq-card{height:100%;min-height:0}
+@media(max-height:800px){.stage-now{grid-template-rows:49px minmax(72px,auto) minmax(100px,1fr) clamp(118px,20vh,156px);row-gap:8px}}
+@media(max-height:700px){.stage-now{grid-template-rows:49px minmax(62px,auto) minmax(80px,1fr) clamp(100px,19vh,128px);row-gap:6px}}
