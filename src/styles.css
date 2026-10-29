@@ -66,5 +66,8 @@ body,.app-shell{min-height:0}
 .stage-now .visual-panel{min-height:0;flex:none}
 .stage-now .eq-inline{width:100%;height:auto;min-height:0;flex:none;margin:0}
 .stage-now .eq-card{height:100%;min-height:0}
+.eq-sliders{grid-template-rows:minmax(0,1fr);padding:8px 0 10px;min-height:0}
+.eq-band{height:auto;min-height:0;grid-template-rows:auto minmax(0,1fr) auto}
+.eq-band input{height:100%;min-height:0;max-height:none;margin:0;padding:0}
 @media(max-height:800px){.stage-now{grid-template-rows:49px minmax(72px,auto) minmax(100px,1fr) clamp(118px,20vh,156px);row-gap:8px}}
 @media(max-height:700px){.stage-now{grid-template-rows:49px minmax(62px,auto) minmax(80px,1fr) clamp(100px,19vh,128px);row-gap:6px}}

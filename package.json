@@ -1,6 +1,6 @@
 {
   "name": "dr-puz-audio-lab",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "description": "Lokalny odtwarzacz audio i wideo dla Windows.",
   "main": "./out/main/index.js",
