@@ -9,7 +9,17 @@ let statePath = ''
 const folderWatchers = new Map<string, FSWatcher>()
 
 function readState(): PersistedState {
-  try { return { ...defaultState, ...JSON.parse(require('node:fs').readFileSync(statePath, 'utf8')) } }
+  try {
+    const parsed = JSON.parse(require('node:fs').readFileSync(statePath, 'utf8')) as Partial<PersistedState> & { playbackTempo?: number; crossfadeSeconds?: number }
+    const globalBpm = Number.isFinite(parsed.globalBpm) ? parsed.globalBpm! : Math.round(120 * (parsed.playbackTempo ?? 1))
+    const legacyBars = (parsed.crossfadeSeconds ?? 8) * globalBpm / 240
+    const options = [1, 2, 4, 8, 16]
+    const crossfadeBars = options.includes(parsed.crossfadeBars ?? -1)
+      ? parsed.crossfadeBars!
+      : options.reduce((closest, bars) => Math.abs(bars - legacyBars) < Math.abs(closest - legacyBars) ? bars : closest, 4)
+    const { playbackTempo: _playbackTempo, crossfadeSeconds: _crossfadeSeconds, ...saved } = parsed
+    return { ...defaultState, ...saved, globalBpm, crossfadeBars }
+  }
   catch { return structuredClone(defaultState) }
 }
 

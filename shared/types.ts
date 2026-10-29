@@ -45,7 +45,7 @@ export interface PersistedState {
   alwaysOnTop: boolean
   globalBpm: number
   crossfadeEnabled: boolean
-  crossfadeSeconds: number
+  crossfadeBars: number
 }
 
 export interface SystemStats {
@@ -100,5 +100,5 @@ export const defaultState: PersistedState = {
   folders: [], tracks: [], playlists: [], favorites: [], queue: [], currentTrackId: null,
   currentTime: 0, volume: 0.78, eqValues: Array(10).fill(0), eqPreset: 'Płaski',
   customPresets: [], shuffle: false, repeat: 'off', alwaysOnTop: false,
-  globalBpm: 120, crossfadeEnabled: false, crossfadeSeconds: 6
+  globalBpm: 120, crossfadeEnabled: false, crossfadeBars: 4
 }
