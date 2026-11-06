@@ -1,6 +1,8 @@
 export const EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
 
-export const BUILTIN_PRESETS = [
+export interface EqPreset { name: string; values: number[] }
+
+export const BUILTIN_PRESETS: EqPreset[] = [
   { name: 'Płaski', values: [0,0,0,0,0,0,0,0,0,0] },
   { name: 'Pop', values: [-1,2,4,5,2,-1,-1,0,2,3] },
   { name: 'Rock', values: [5,4,2,-1,-2,1,3,4,4,4] },

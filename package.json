@@ -1,6 +1,6 @@
 {
   "name": "dr-puz-audio-lab",
-  "version": "0.1.13",
+  "version": "0.2.0",
   "private": true,
   "description": "Lokalny odtwarzacz audio i wideo dla Windows.",
   "main": "./out/main/index.js",
@@ -9,6 +9,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "dist:win": "npm run build && electron-builder --win nsis",
+    "release:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release-win.ps1",
+    "verify:win-signatures": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-win-signatures.ps1",
     "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
@@ -25,7 +27,7 @@
     "@types/three": "^0.171.0",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^45.0.0",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "^27.0.0-alpha.14",
     "electron-vite": "^6.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -35,22 +37,39 @@
   "build": {
     "appId": "pl.drpuz.audiolab",
     "productName": "Dr.Puz Audio Lab",
+    "forceCodeSigning": true,
     "directories": {
       "output": "release"
     },
-    "files": [
-      "out/**/*",
-      "package.json"
-    ],
+    "fileOptions": {
+      "files": [
+        "out/**/*",
+        "package.json"
+      ]
+    },
     "win": {
+      "icon": "buildResources/drpuz-mark.ico",
       "target": [
         "nsis"
       ],
-      "artifactName": "DrPuz-Audio-Lab-${version}-Setup.${ext}"
+      "artifactName": "DrPuz-Audio-Lab-${version}-Setup.${ext}",
+      "signExts": [
+        ".exe",
+        ".dll"
+      ],
+      "sign": {
+        "type": "signtool",
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      }
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "installerIcon": "buildResources/drpuz-mark.ico",
+      "uninstallerIcon": "buildResources/drpuz-mark.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },

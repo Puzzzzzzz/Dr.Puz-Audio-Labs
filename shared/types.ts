@@ -12,8 +12,30 @@ export interface Track {
   size: number
   addedAt: number
   bpm?: number
+  /** BPM detected by analysis before a manual half-time/double-time correction. */
+  bpmOriginal?: number
+  bpmAdjustment?: 'double' | 'half'
   beatOffset?: number
   beatStart?: number
+  /** Harmonic key written as a Camelot code, e.g. "8A". */
+  key?: string
+  /** Human-readable key from the same analysis, e.g. "A-moll". */
+  keyName?: string
+  /** Integrated loudness (LUFS) measured during analysis. */
+  loudness?: number
+  /** ReplayGain value in dB that aligns the track with the −18 LUFS target. */
+  gainDb?: number
+  /** Manual cue points in seconds, snapped to the beat grid when available. */
+  cues?: CuePoint[]
+}
+
+export interface CuePoint {
+  time: number
+}
+
+export interface PlayedEntry {
+  trackId: string
+  at: number
 }
 
 export interface Playlist {
@@ -46,6 +68,12 @@ export interface PersistedState {
   globalBpm: number
   crossfadeEnabled: boolean
   crossfadeBars: number
+  /** Auto DJ replenishes the queue with tempo/key-compatible tracks. */
+  autoDj: boolean
+  /** Align track loudness with the −18 LUFS target during playback. */
+  normalize: boolean
+  playCounts: Record<string, number>
+  history: PlayedEntry[]
 }
 
 export interface SystemStats {
@@ -72,6 +100,10 @@ export interface MediaAppApi {
   openSubtitle: () => Promise<{ name: string; text: string } | null>
   importPlaylist: () => Promise<{ path: string; text: string } | null>
   exportPlaylist: (name: string, text: string) => Promise<boolean>
+  /** Resolves the absolute path of a dropped File; empty string when unavailable. */
+  pathForFile: (file: unknown) => string
+  /** Saves recorded mix bytes through a native save dialog. */
+  saveRecording: (bytes: Uint8Array, name: string) => Promise<boolean>
   readStats: () => Promise<SystemStats>
   onFolderChanged: (callback: (folder: string) => void) => () => void
 }
@@ -100,5 +132,6 @@ export const defaultState: PersistedState = {
   folders: [], tracks: [], playlists: [], favorites: [], queue: [], currentTrackId: null,
   currentTime: 0, volume: 0.78, eqValues: Array(10).fill(0), eqPreset: 'Płaski',
   customPresets: [], shuffle: false, repeat: 'off', alwaysOnTop: false,
-  globalBpm: 120, crossfadeEnabled: false, crossfadeBars: 4
+  globalBpm: 120, crossfadeEnabled: false, crossfadeBars: 4,
+  autoDj: false, normalize: false, playCounts: {}, history: []
 }

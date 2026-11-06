@@ -1,8 +1,8 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { PersistedState, Track, SystemStats } from '../../shared/types'
 
 const mediaApp = {
-  version: () => '0.1.13',
+  version: () => '0.2.0',
   controlWindow: (action: 'minimize' | 'maximize' | 'close') => ipcRenderer.send('window:control', action),
   setAlwaysOnTop: (enabled: boolean) => ipcRenderer.send('window:always-on-top', enabled),
   readAudioFile: (path: string): Promise<Uint8Array> => ipcRenderer.invoke('media:read-audio', path),
@@ -15,6 +15,8 @@ const mediaApp = {
   openSubtitle: (): Promise<{ name: string; text: string } | null> => ipcRenderer.invoke('dialog:open-subtitle'),
   importPlaylist: (): Promise<{ path: string; text: string } | null> => ipcRenderer.invoke('playlist:import'),
   exportPlaylist: (name: string, text: string): Promise<boolean> => ipcRenderer.invoke('playlist:export', { name, text }),
+  pathForFile: (file: unknown): string => webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0]),
+  saveRecording: (bytes: Uint8Array, name: string): Promise<boolean> => ipcRenderer.invoke('dialog:save-recording', { bytes, name }),
   readStats: (): Promise<SystemStats> => ipcRenderer.invoke('stats:read'),
   onFolderChanged: (callback: (folder: string) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, folder: string) => callback(folder)

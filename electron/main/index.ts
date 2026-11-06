@@ -111,6 +111,20 @@ function registerIpc() {
     await fs.writeFile(result.filePath, text, 'utf8')
     return true
   })
+  ipcMain.handle('dialog:save-recording', async (_event, { bytes, name }: { bytes: unknown; name: unknown }) => {
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength < 16 || bytes.byteLength > 2 * 1024 * 1024 * 1024) {
+      throw new Error('Nagranie jest nieprawidłowe lub przekracza limit rozmiaru.')
+    }
+    const safeName = (typeof name === 'string' && name.trim() ? name.trim() : 'drpuz-miks')
+      .replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, ' ').slice(0, 120).trim() || 'drpuz-miks'
+    const result = await dialog.showSaveDialog({
+      defaultPath: `${safeName}.webm`,
+      filters: [{ name: 'Nagranie WebM', extensions: ['webm'] }]
+    })
+    if (result.canceled || !result.filePath) return false
+    await fs.writeFile(result.filePath, bytes)
+    return true
+  })
   ipcMain.handle('stats:read', async (): Promise<SystemStats> => {
     const [load, mem, graphics, appMetrics] = await Promise.allSettled([si.currentLoad(), si.mem(), si.graphics(), Promise.resolve(app.getAppMetrics())])
     const totalCpu = load.status === 'fulfilled' && Number.isFinite(load.value.currentLoad) ? load.value.currentLoad : null
@@ -141,7 +155,7 @@ function createWindow() {
     x: workArea.x + Math.max(0, Math.floor((workArea.width - width) / 2)),
     y: workArea.y + Math.max(0, Math.floor((workArea.height - height) / 2)),
     width, height, minWidth: Math.min(1120, workArea.width), minHeight: Math.min(600, workArea.height), frame: false,
-    backgroundColor: '#050713', title: 'Dr.Puz Audio Lab', autoHideMenuBar: true,
+    backgroundColor: '#0b0b0d', title: 'Dr.Puz Audio Lab', autoHideMenuBar: true,
     alwaysOnTop: readState().alwaysOnTop,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

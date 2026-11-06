@@ -2,12 +2,12 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 
 export const VISUALS = [
-  { id: 'orb', name: 'Kula plazmy', color: '#1de8ff' },
-  { id: 'tunnel', name: 'Neonowy tunel', color: '#f529d5' },
-  { id: 'particles', name: 'Kosmiczny pył', color: '#23e8ff' },
-  { id: 'waves', name: 'Fale widma', color: '#f529d5' },
-  { id: 'rings', name: 'Orbitalne pierścienie', color: '#20e6ff' },
-  { id: 'spectrum', name: 'Spektrum 3D', color: '#f42acb' }
+  { id: 'orb', name: 'Kula plazmy' },
+  { id: 'tunnel', name: 'Tunel' },
+  { id: 'particles', name: 'Kosmiczny pył' },
+  { id: 'waves', name: 'Fale widma' },
+  { id: 'rings', name: 'Orbitalne pierścienie' },
+  { id: 'spectrum', name: 'Spektrum 3D' }
 ] as const
 
 export type VisualMode = typeof VISUALS[number]['id']
@@ -25,17 +25,18 @@ export default function Visualizer({ mode, analyser, active }: Props) {
     const host = hostRef.current
     if (!host) return
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#060916')
-    scene.fog = new THREE.FogExp2('#060916', 0.045)
+    scene.background = new THREE.Color('#0a0a0c')
+    scene.fog = new THREE.FogExp2('#0a0a0c', 0.045)
     const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100)
     camera.position.set(0, 0, 8)
     const renderer = new THREE.WebGLRenderer({ alpha: false, antialias: true, powerPreference: 'low-power' })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
     renderer.outputColorSpace = THREE.SRGBColorSpace
     host.appendChild(renderer.domElement)
-    scene.add(new THREE.AmbientLight('#a9eaff', 1.15))
-    const cyan = new THREE.MeshBasicMaterial({ color: '#1de8ff', wireframe: true, transparent: true, opacity: 0.86 })
-    const pink = new THREE.MeshBasicMaterial({ color: '#f329d1', wireframe: true, transparent: true, opacity: 0.82 })
+    scene.add(new THREE.AmbientLight('#ebd9e6', 1.1))
+    const pink = new THREE.MeshBasicMaterial({ color: '#f445c8', wireframe: true, transparent: true, opacity: 0.84 })
+    const ink = new THREE.MeshBasicMaterial({ color: '#dcd9d6', wireframe: true, transparent: true, opacity: 0.7 })
+    const cyan = ink
     const group = new THREE.Group()
     scene.add(group)
     const bars: THREE.Mesh[] = []
@@ -67,7 +68,7 @@ export default function Visualizer({ mode, analyser, active }: Props) {
       }
       particleGeometry = new THREE.BufferGeometry()
       particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3))
-      group.add(new THREE.Points(particleGeometry, new THREE.PointsMaterial({ color: '#23dcff', size: 0.045, transparent: true, opacity: 0.85 })))
+      group.add(new THREE.Points(particleGeometry, new THREE.PointsMaterial({ color: '#f445c8', size: 0.045, transparent: true, opacity: 0.85 })))
     } else if (mode === 'waves') {
       const geometry = new THREE.PlaneGeometry(9, 5, 55, 32)
       const mesh = new THREE.Mesh(geometry, cyan)
@@ -84,7 +85,7 @@ export default function Visualizer({ mode, analyser, active }: Props) {
         ring.rotation.set(0.3 + i * 0.16, 0.2 + i * 0.11, 0)
         group.add(ring)
       }
-      group.add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 18, 18), new THREE.MeshBasicMaterial({ color: '#0bdfff', transparent: true, opacity: 0.15 })))
+      group.add(new THREE.Mesh(new THREE.SphereGeometry(0.55, 18, 18), new THREE.MeshBasicMaterial({ color: '#f445c8', transparent: true, opacity: 0.12 })))
     } else {
       for (let i = 0; i < 48; i++) {
         const bar = new THREE.Mesh(new THREE.BoxGeometry(0.105, 1, 0.13), i % 2 ? cyan : pink)

@@ -1,0 +1,54 @@
+name: Windows signed release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read package version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Prepare signing certificate
+        shell: pwsh
+        env:
+          WIN_CSC_PFX_BASE64: ${{ secrets.WIN_CSC_PFX_BASE64 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_PFX_BASE64)) {
+            throw 'Configure the WIN_CSC_PFX_BASE64 repository secret before building a release.'
+          }
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'drpuz-code-signing.pfx'
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WIN_CSC_PFX_BASE64))
+          "WIN_CSC_LINK=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WIN_CSC_KEY_PASSWORD=$env:WIN_CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build, sign, and verify
+        run: npm run release:win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DrPuz-Audio-Lab-Windows-${{ github.ref_name }}
+          path: release/DrPuz-Audio-Lab-${{ steps.version.outputs.value }}-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
